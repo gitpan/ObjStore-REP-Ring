@@ -14,6 +14,7 @@ struct osp_ring_page : os_virtual_behavior {
 
   void cache_keys(osp_pathexam &exam, OSSVPV *pv);
   void uncache_keys();
+  void verify_keys(osp_pathexam &exam);
   int qck_cmp(osp_pathexam &exam, int update_ok);
 
   void reset_first();
@@ -70,6 +71,7 @@ struct OSPV_ring_index1 : OSPV_Generic {
   virtual char *rep_class(STRLEN *len);
   virtual OSSVPV *new_cursor(os_segment *seg);
   virtual double _percent_filled();
+  virtual void _debug1(void *);
   virtual int add(OSSVPV *);
   virtual int remove(OSSVPV *);
   virtual int FETCHSIZE();
@@ -108,7 +110,7 @@ struct OSPV_ring_index1_cs : OSPV_Cursor2 {
   virtual OSSVPV *focus();
   virtual void moveto(I32);
   virtual void step(I32 delta);
-  virtual I32 pos();
+  virtual I32 pos(); //probably not kept up-to-date
   virtual void at();
   virtual void keys();
   virtual void store(SV *);

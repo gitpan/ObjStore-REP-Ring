@@ -1,3 +1,4 @@
+ChangeLog
 MANIFEST
 MANIFEST.SKIP
 Makefile.PL
@@ -6,6 +7,7 @@ REP-Ring-01.sch
 Ring.h
 Ring.pm
 Ring.xs
+TODO
 hints/dec_osf.pl
 hints/solaris_2.pl
 t/0load.t
@@ -14,3 +16,4 @@ t/1simple.t
 t/1splice.t
 t/2add.t
 t/2index.t
+t/2randadd.t

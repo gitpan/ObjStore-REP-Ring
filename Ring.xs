@@ -31,6 +31,15 @@ void osp_ring_page::cache_keys(osp_pathexam &exam, OSSVPV *pv)
   exam.load_keypack1(pv, keys);
 }
 
+void osp_ring_page::verify_keys(osp_pathexam &exam)
+{
+  if (!keys.cnt) return;
+
+  osp_keypack1 kp;
+  exam.load_keypack1(*first, kp);
+  if (!(kp == keys)) croak("Key cache out of sync");
+}
+
 int osp_ring_page::qck_cmp(osp_pathexam &exam, int update_ok)
 {
   if (update_ok && !keys.cnt)
@@ -126,6 +135,7 @@ void osp_ring_page::push(OSSVPV *pv)
 
 void osp_ring_page::prepare_insert(int items)
 {
+  uncache_keys();
   OSPVptr *top = array();
   if (!first) first = top;
   assert(fill + items <= get_max());
@@ -174,7 +184,9 @@ void osp_ring_page::fwd_xfer(int at)
 void osp_ring_page::insert_after(int at, OSSVPV *pv)
 {
   reset_first();
-  if (at < fill - 1) _move(first + at + 1, first + fill - 1, first + at + 2);
+  if (at < fill - 1) {
+    _move(first + at + 1, first + fill - 1, first + at + 2);
+  }
   *(first + at + 1) = pv;
   ++fill;
 }
@@ -326,10 +338,7 @@ char *OSPV_ring_index1::rep_class(STRLEN *len)
 { *len = 26; return "ObjStore::REP::Ring::Index"; }
 
 int OSPV_ring_index1::FETCHSIZE()
-{
-  fix_stats();
-  return fill;
-}
+{ return read_fill(); }
 
 void OSPV_ring_index1::CLEAR()
 {
@@ -341,6 +350,20 @@ void OSPV_ring_index1::CLEAR()
   }
   fill = 0;
   assert(!max);
+}
+
+void OSPV_ring_index1::_debug1(void *)
+{
+  dOSP;
+  osp_pathexam *exam = &osp->exam;
+  exam->init();
+  exam->load_path(((OSSVPV*)conf)->avx(1)->safe_rv());
+
+  osp_ring_page *pp = first;
+  while (pp) {
+    pp->verify_keys(*exam);
+    pp = pp->next;
+  }
 }
 
 void OSPV_ring_index1::free_page(osp_ring_page *pp)
@@ -378,8 +401,7 @@ void OSPV_ring_index1::FETCH(SV *key)
   I16 off;
   osp_ring_page *pp;
   U32 to = osp_thr::sv_2aelem(key);
-  fix_stats();
-  if (to < 0 || to >= fill)
+  if (to < 0 || to >= read_fill())
     return;
   pp = get_page(to, &off);
   OSSVPV *pv = pp->at(off).resolve();
@@ -514,6 +536,7 @@ double OSPV_ring_index1::_percent_filled()
 
 void OSPV_ring_index1_cs::CHK_VER()
 {
+  // incr(version) only happens when pages are freed!
   OSPV_ring_index1 *rp = (OSPV_ring_index1 *) myfocus.resolve();
   STRLEN _len;
   if (version != rp->version)
@@ -687,18 +710,22 @@ int OSPV_ring_index1::add(OSSVPV *pv)
   if (!pp) {
     pp = first;
     if (!pp || !pp->avail()) pp = new_page(first, 0);
+    //warn("4");
     pp->unshift(pv);
     return 1;
   }
   for (int xx = pp->fill - 1; xx >= 0; xx--) {
     if (exam->compare(pp->at(xx), 0) >= 0) {
       if (pp->avail()) {
+	//warn("1 [%d]", xx);
 	pp->insert_after(xx, pv);
       } else {
 	if (xx < pp->fill - 1) {
+	  //warn("2");
 	  split(pp, xx+1);
 	  pp->push(pv);
 	} else {
+	  //warn("3");
 	  osp_ring_page *npg = new_page(pp, 1);
 	  pp->fwd_xfer(pp->fill/2);
 	  npg->push(pv);
